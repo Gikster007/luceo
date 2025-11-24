@@ -20,3 +20,6 @@ file(GLOB_RECURSE PROJECT_SOURCES
 
 # Add executable
 add_executable(luceo ${PROJECT_SOURCES})
+
+# Add subdirectories
+add_subdirectory("extern")

@@ -1,0 +1,19 @@
+# George B. (Gikster007) Clang Format
+
+BasedOnStyle: Microsoft
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+ColumnLimit: 100
+
+# DO NOT Sort includes!
+SortIncludes: false
+
+# Pointers & References
+DerivePointerAlignment: false
+PointerAlignment: Left
+ReferenceAlignment: Left
+
+# Function Decalration Spacing
+PenaltyBreakBeforeFirstCallParameter: 100
+AlwaysBreakTemplateDeclarations: Yes
