@@ -5,13 +5,13 @@
 #include <graphite/render_graph.hh>
 #include <graphite/nodes/raster_node.hh>
 
+#include <glm/glm.hpp>
+
 #include "window/window.hpp"
 
 struct Vertex
 {
-    float x;
-    float y;
-    float z;
+    glm::vec3 pos;
 };
 
 Renderer::Renderer(Window& window)
@@ -66,10 +66,11 @@ void Renderer::init()
     }
     else
         vertex_buffer = r.unwrap();
+
     std::vector<Vertex> vertices{};
-    vertices.push_back({-0.5f, 0.5f, 0.0f});
-    vertices.push_back({0.0f, -0.5f, 0.0f});
-    vertices.push_back({0.5f, 0.5f, 0.0f});
+    vertices.push_back({glm::vec3(-0.5f, 0.5f, 0.0f)});
+    vertices.push_back({glm::vec3(0.0f, -0.5f, 0.0f)});
+    vertices.push_back({glm::vec3(0.5f, 0.5f, 0.0f)});
     bank.upload_buffer(vertex_buffer, vertices.data(), 0, sizeof(Vertex) * 3);
 }
 
