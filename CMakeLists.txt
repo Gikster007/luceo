@@ -23,3 +23,19 @@ add_executable(luceo ${PROJECT_SOURCES})
 
 # Add subdirectories
 add_subdirectory("extern")
+
+# Add include paths
+target_include_directories(luceo
+    PUBLIC ${CMAKE_SOURCE_DIR}/src/
+)
+
+# Compile shaders
+include(scripts/cmake/shader_compilation.cmake)
+compile_shaders()
+
+# Always copy the assets folder after building
+add_custom_command(TARGET luceo POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+            ${CMAKE_SOURCE_DIR}/assets $<TARGET_FILE_DIR:luceo>/assets
+    COMMENT "Copying assets folder to output directory"
+)

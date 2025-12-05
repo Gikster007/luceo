@@ -2,25 +2,34 @@
 
 #include <SDL3/SDL.h>
 
-void Window::init() const
+void Window::init()
 {
     SDL_SetAppMetadata("luceo", "0.1", "com.luceo.project");
 
     if (!SDL_Init(SDL_INIT_VIDEO))
     {
-        SDL_Log("Couldn't initialize SDL: %s", SDL_GetError());
+        printf("Couldn't initialize SDL: %s \n", SDL_GetError());
         return;
     }
 
-    if (!SDL_CreateWindow(title.data(), width, height, SDL_WINDOW_VULKAN))
+    window = SDL_CreateWindow(title.data(), width, height, SDL_WINDOW_VULKAN);
+
+    if (!window)
     {
-        SDL_Log("Couldn't create window: %s", SDL_GetError());
+        printf("Couldn't create window: %s \n", SDL_GetError());
         return;
     }
 }
 
 void Window::update()
 {
+    uint64_t now = SDL_GetTicks();
+    if (now > last)
+    {
+        dt = ((float)now - last) / 1000.0f;
+        last = now;
+    }
+
     SDL_Event event{};
 
     while (SDL_PollEvent(&event))
@@ -34,6 +43,13 @@ void Window::update()
             break;
         }
     }
+}
+
+HWND Window::get_window_handle() const
+{
+    const SDL_PropertiesID props = SDL_GetWindowProperties(window);
+
+    return (HWND)SDL_GetPointerProperty(props, SDL_PROP_WINDOW_WIN32_HWND_POINTER, nullptr);
 }
 
 Window::~Window()

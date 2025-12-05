@@ -2,6 +2,11 @@
 
 #include <string_view>
 
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
+#undef min
+#undef max
+
 class SDL_Window;
 
 class Window
@@ -13,8 +18,10 @@ class Window
     Window(const Window&) = delete;
     Window& operator=(const Window&) = delete;
 
-    void init() const;
+    void init();
     void update();
+
+    HWND get_window_handle() const;
 
   public:
     SDL_Window* window = nullptr;
@@ -23,4 +30,7 @@ class Window
     int height = 720;
     std::string_view title{};
     bool is_running = true;
+
+    float dt = 0.0f;
+    float last = 0.0f;
 };

@@ -7,5 +7,10 @@ set(SDL_DISABLE_INSTALL ON)
 set(SDL_DISABLE_INSTALL_DOCS ON)
 set(SDL_INSTALL_TESTS OFF)
 add_subdirectory(SDL3)
-target_link_libraries(luceo PRIVATE SDL3::SDL3-static)
 #target_include_directories(luceo PRIVATE "./SDL3")
+
+# graphite - https://github.com/mxcop/graphite
+add_subdirectory(graphite)
+
+# Link Libraries
+target_link_libraries(luceo PRIVATE SDL3::SDL3-static graphite)
