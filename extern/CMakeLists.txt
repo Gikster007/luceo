@@ -12,5 +12,11 @@ add_subdirectory(SDL3)
 # graphite - https://github.com/mxcop/graphite
 add_subdirectory(graphite)
 
+# GLM - https://github.com/g-truc/glm
+add_subdirectory(glm)
+
+# STB Image - https://github.com/nothings/stb/blob/master/stb_image.h
+target_include_directories(luceo PRIVATE "./stb/")
+
 # Link Libraries
-target_link_libraries(luceo PRIVATE SDL3::SDL3-static graphite)
+target_link_libraries(luceo PRIVATE SDL3::SDL3-static graphite glm::glm)
