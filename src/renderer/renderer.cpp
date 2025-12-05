@@ -4,15 +4,18 @@
 #include <graphite/gpu_adapter.hh>
 #include <graphite/render_graph.hh>
 #include <graphite/nodes/raster_node.hh>
+#include <graphite/nodes/compute_node.hh>
 
 #include <glm/glm.hpp>
 
-#include "window/window.hpp"
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb_image.h>
 
-struct Vertex
-{
-    glm::vec3 pos;
-};
+#include <imgui.h>
+#include <imgui_impl_sdl3.h>
+#include <imgui_impl_vulkan.h>
+
+#include "window/window.hpp"
 
 Renderer::Renderer(Window& window)
     : window(window), gpu(*new GPUAdapter()), render_graph(*new RenderGraph())
@@ -56,44 +59,83 @@ void Renderer::init()
     else
         render_target = r.unwrap();
 
-    /* Initialise a vertex buffer */
-    if (const Result r = bank.create_buffer(BufferUsage::Vertex | BufferUsage::TransferDst, 1,
-                                            sizeof(Vertex) * 3);
+    /* Initialize ImGui */
+    ImGui::CreateContext();
+    ImGui_ImplSDL3_InitForVulkan(window.window);
+    if (const Result r = imgui.init(gpu, render_target, IMGUI_FUNCTIONS); r.is_err())
+    {
+        printf("failed to initialize imgui.\nreason: %s \n", r.unwrap_err().c_str());
+        return;
+    }
+
+    /* Load a test png */
+    int tex_width = -1;
+    int tex_height = -1;
+    int channels = -1;
+    unsigned char* data = nullptr;
+
+    data = stbi_load("assets/test.jpg", &tex_width, &tex_height, &channels, 4);
+    if (!data)
+    {
+        printf("failed to load image.\n");
+        return;
+    }
+
+    /* Initialise a debug texture */
+    if (const Result r =
+            bank.create_texture(TextureUsage::Sampled | TextureUsage::TransferDst,
+                                TextureFormat::RGBA8Unorm, {(u32)tex_width, (u32)tex_height, 0});
         r.is_err())
     {
-        printf("failed to initialise constant buffer.\nreason: %s \n", r.unwrap_err().c_str());
+        printf("failed to initialize debug texture.\nreason: %s\n", r.unwrap_err().c_str());
         return;
     }
     else
-        vertex_buffer = r.unwrap();
+        test_tex = r.unwrap();
 
-    std::vector<Vertex> vertices{};
-    vertices.push_back({glm::vec3(-0.5f, 0.5f, 0.0f)});
-    vertices.push_back({glm::vec3(0.0f, -0.5f, 0.0f)});
-    vertices.push_back({glm::vec3(0.5f, 0.5f, 0.0f)});
-    bank.upload_buffer(vertex_buffer, vertices.data(), 0, sizeof(Vertex) * 3);
+    if (const Result r = bank.upload_texture(test_tex, data, tex_width * tex_height * channels);
+        r.is_err())
+    {
+        printf("failed to upload the debug texture.\nreason: %s\n", r.unwrap_err().c_str());
+        return;
+    }
+    free(data);
+
+    if (const Result r = bank.create_image(test_tex); r.is_err())
+    {
+        printf("failed to initialize debug image.\nreason: %s\n", r.unwrap_err().c_str());
+        return;
+    }
+    else
+        test_img = r.unwrap();
 }
 
 void Renderer::update(float dt)
 {
+    imgui.new_frame();
+    ImGui_ImplSDL3_NewFrame();
+    ImGui::NewFrame();
+
+    bool show_demo = true;
+    ImGui::ShowDemoWindow(&show_demo);
+
+    ImGui::Render();
+
     render_graph.new_graph().unwrap();
 
     // Render Passes
     // clang-format off
     {
-        // Test Triangle Pass
-        RasterNode& graphics_pass = render_graph.add_raster_pass("graphics pass", "test.vx", "test.px")
-                                    .topology(Topology::TriangleList)
-                                    .attribute(AttrFormat::XYZ32_SFloat)  // Position
-                                    .attach(render_target)
-                                    .raster_extent(window.width, window.height);
-        graphics_pass.draw(vertex_buffer, 3);
+        render_graph.add_compute_pass("Image Blit", "blit.cs")
+                    .read(test_img)
+                    .write(render_target)
+                    .group_size(8, 8)
+                    .work_size(window.width, window.height);
     }
     // clang-format on
 
     /* Add the immediate mode GUI to the render graph */
-    if (imgui != nullptr)
-        render_graph.add_imgui(*imgui, render_target);
+    render_graph.add_imgui(imgui, render_target);
 
     /* Compile the render graph */
     if (const Result r = render_graph.end_graph(); r.is_err())
@@ -106,22 +148,12 @@ void Renderer::update(float dt)
 void Renderer::end()
 {
     VRAMBank& bank = gpu.get_vram_bank();
-    bank.destroy(vertex_buffer);
+    bank.destroy(test_tex);
+    bank.destroy(test_img);
     bank.destroy(render_target);
 
     /* Cleanup the VRAM bank & GPU adapter */
     render_graph.deinit().expect("failed to destroy render graph.");
     bank.deinit().expect("failed to destroy vram bank.");
     gpu.deinit().expect("failed to destroy gpu adapter.");
-}
-
-void Renderer::set_imgui(ImGUI* imgui, ImGUIFunctions functions)
-{
-    this->imgui = imgui;
-    /* Initialize the immediate mode GUI */
-    if (const Result r = imgui->init(gpu, render_target, functions); r.is_err())
-    {
-        printf("failed to initialize imgui.\nreason: %s \n", r.unwrap_err().c_str());
-        return;
-    }
 }

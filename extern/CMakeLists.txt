@@ -18,5 +18,25 @@ add_subdirectory(glm)
 # STB Image - https://github.com/nothings/stb/blob/master/stb_image.h
 target_include_directories(luceo PRIVATE "./stb/")
 
+# ImGUI - immediate mode gui
+    # https://github.com/ocornut/imgui
+    target_sources(luceo
+        PRIVATE "./imgui/imgui_demo.cpp"
+        PRIVATE "./imgui/imgui_draw.cpp"
+        PRIVATE "./imgui/imgui_tables.cpp"
+        PRIVATE "./imgui/imgui_widgets.cpp"
+        PRIVATE "./imgui/imgui.cpp"
+        PRIVATE "./imgui/backends/imgui_impl_sdl3.cpp"
+        PRIVATE "./imgui/backends/imgui_impl_vulkan.cpp"
+        PRIVATE "./imgui/backends/imgui_impl_win32.cpp"
+    )
+    target_include_directories(luceo
+        PRIVATE "./imgui"
+        PRIVATE "./imgui/backends"
+    )
+
+    target_compile_definitions(luceo PRIVATE IMGUI_IMPL_VULKAN_USE_VOLK)
+
+
 # Link Libraries
 target_link_libraries(luceo PRIVATE SDL3::SDL3-static graphite glm::glm)

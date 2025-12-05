@@ -2,6 +2,8 @@
 
 #include <SDL3/SDL.h>
 
+#include <imgui_impl_sdl3.h>
+
 void Window::init()
 {
     SDL_SetAppMetadata("luceo", "0.1", "com.luceo.project");
@@ -34,6 +36,7 @@ void Window::update()
 
     while (SDL_PollEvent(&event))
     {
+        ImGui_ImplSDL3_ProcessEvent(&event);
         switch (event.type)
         {
         case SDL_EVENT_QUIT:

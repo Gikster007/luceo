@@ -20,15 +20,15 @@ class Renderer
     void update(float dt);
     void end();
 
-    void set_imgui(ImGUI* imgui, ImGUIFunctions functions);
-
   private:
     Window& window;
     GPUAdapter& gpu;
     RenderGraph& render_graph;
 
     RenderTarget render_target{};
-    Buffer vertex_buffer{};
 
-    ImGUI* imgui = nullptr;
+    Texture test_tex{};
+    Image test_img{};
+
+    ImGUI imgui{};
 };

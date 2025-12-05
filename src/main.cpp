@@ -17,8 +17,6 @@ int main()
         window.update();
         float& dt = window.dt;
 
-		printf("Delta Time: %f \n", dt);
-
 		renderer.update(dt);
 	}
 
