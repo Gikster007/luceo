@@ -36,6 +36,7 @@ void Renderer::init()
         printf("failed to initialize gpu adapter.\nreason: %s \n", r.unwrap_err().c_str());
         return;
     }
+    gpu.set_logger();
 
     /* Initialize the Render Graph */
     render_graph.set_shader_path("assets/shaders/bin");
@@ -62,7 +63,7 @@ void Renderer::init()
     /* Initialize ImGui */
     ImGui::CreateContext();
     ImGui_ImplSDL3_InitForVulkan(window.window);
-    if (const Result r = imgui.init(gpu, render_target, IMGUI_FUNCTIONS); r.is_err())
+    if (const Result r = imgui.init(gpu, render_target); r.is_err())
     {
         printf("failed to initialize imgui.\nreason: %s \n", r.unwrap_err().c_str());
         return;
@@ -74,7 +75,7 @@ void Renderer::init()
     int channels = -1;
     unsigned char* data = nullptr;
 
-    data = stbi_load("assets/test.jpg", &tex_width, &tex_height, &channels, 4);
+    data = stbi_load("assets/experiment.png", &tex_width, &tex_height, &channels, 4);
     if (!data)
     {
         printf("failed to load image.\n");
@@ -92,7 +93,6 @@ void Renderer::init()
     }
     else
         test_tex = r.unwrap();
-
     if (const Result r = bank.upload_texture(test_tex, data, tex_width * tex_height * channels);
         r.is_err())
     {
@@ -101,6 +101,7 @@ void Renderer::init()
     }
     free(data);
 
+    /* Initialise a debug image, from the debug texture */
     if (const Result r = bank.create_image(test_tex); r.is_err())
     {
         printf("failed to initialize debug image.\nreason: %s\n", r.unwrap_err().c_str());
@@ -109,6 +110,27 @@ void Renderer::init()
     else
         test_img = r.unwrap();
 
+    /* Initialise a frequency texture (output from a forward fft) */
+    if (const Result r =
+            bank.create_texture(TextureUsage::Sampled | TextureUsage::Storage | TextureUsage::TransferDst,
+                                TextureFormat::RGBA16Sfloat, {(u32)512, (u32)512, 0});
+        r.is_err())
+    {
+        printf("failed to initialize frequency texture.\nreason: %s\n", r.unwrap_err().c_str());
+        return;
+    }
+    else
+        freq_tex = r.unwrap();
+    /* Initialise a frequency image, from the frequency texture */
+    if (const Result r = bank.create_image(freq_tex); r.is_err())
+    {
+        printf("failed to initialize frequency image.\nreason: %s\n", r.unwrap_err().c_str());
+        return;
+    }
+    else
+        freq_img = r.unwrap();
+
+    /* Initialise a sampler */
     if (const Result r = bank.create_sampler(); r.is_err())
     {
         printf("failed to initialize linear sampler.\nreason: %s\n", r.unwrap_err().c_str());
@@ -117,6 +139,8 @@ void Renderer::init()
     else
         linear_sampler = r.unwrap();
 }
+
+static bool flag = true;
 
 void Renderer::update(float dt)
 {
@@ -134,8 +158,14 @@ void Renderer::update(float dt)
     // Render Passes
     // clang-format off
     {
+        if (flag) 
+        {
+            fft(test_img, freq_img, false);
+            flag = false;
+        }
+
         render_graph.add_compute_pass("Image Blit", "blit.cs")
-                    .read(test_img)
+                    .read(freq_img)
                     .write(render_target)
                     .read(linear_sampler)
                     .group_size(8, 8)
@@ -158,15 +188,21 @@ void Renderer::fft(Image input, Image output, bool is_inverse)
 {
     const std::string_view pass_name = is_inverse ? "Inverse FFT" : "Forward FFT";
 
-    VRAMBank& bank = gpu.get_vram_bank();
-    Texture output_tex = bank.get_texture(output);
+    //VRAMBank& bank = gpu.get_vram_bank();
+    //Texture output_tex = bank.get_texture(output);
 
     // clang-format off
-    render_graph.add_compute_pass(pass_name, "fft.cs")
+    render_graph.add_compute_pass(pass_name, "vertical_fft.cs")
                 .read(input)
                 .write(output)
-                .group_size(8, 8)
-                .work_size(window.width, window.height);
+                .group_size(1, 1)
+                .work_size(1, 512);
+
+    render_graph.add_compute_pass(pass_name, "horizontal_fft.cs")
+                .read(input)
+                .write(output)
+                .group_size(1, 1)
+                .work_size(1, 512);
     // clang-format on
 }
 
@@ -175,8 +211,15 @@ void Renderer::end()
     VRAMBank& bank = gpu.get_vram_bank();
     bank.destroy(test_tex);
     bank.destroy(test_img);
-    bank.destroy(render_target);
+    
+    bank.destroy(freq_tex);
+    bank.destroy(freq_img);
+
     bank.destroy(linear_sampler);
+
+    bank.destroy(render_target);
+
+    imgui.deinit();
 
     /* Cleanup the VRAM bank & GPU adapter */
     render_graph.deinit().expect("failed to destroy render graph.");

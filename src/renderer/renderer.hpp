@@ -34,6 +34,10 @@ class Renderer
 
     Texture test_tex{};
     Image test_img{};
+
+    Texture freq_tex{};
+    Image freq_img{};
+
     Sampler linear_sampler{};
 
     ImGUI imgui{};
