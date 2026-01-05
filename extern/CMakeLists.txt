@@ -10,6 +10,8 @@ add_subdirectory(SDL3)
 #target_include_directories(luceo PRIVATE "./SDL3")
 
 # graphite - https://github.com/mxcop/graphite
+set(GRAPHITE_SAMPLES OFF CACHE BOOL "" FORCE)
+set(GRAPHITE_IMGUI_DIR "${CMAKE_SOURCE_DIR}/extern/imgui/")
 add_subdirectory(graphite)
 
 # GLM - https://github.com/g-truc/glm
