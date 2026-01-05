@@ -154,6 +154,22 @@ void Renderer::update(float dt)
         printf("failed to dispatch render graph.\nreason: %s \n", r.unwrap_err().c_str());
 }
 
+void Renderer::fft(Image input, Image output, bool is_inverse)
+{
+    const std::string_view pass_name = is_inverse ? "Inverse FFT" : "Forward FFT";
+
+    VRAMBank& bank = gpu.get_vram_bank();
+    Texture output_tex = bank.get_texture(output);
+
+    // clang-format off
+    render_graph.add_compute_pass(pass_name, "fft.cs")
+                .read(input)
+                .write(output)
+                .group_size(8, 8)
+                .work_size(window.width, window.height);
+    // clang-format on
+}
+
 void Renderer::end()
 {
     VRAMBank& bank = gpu.get_vram_bank();

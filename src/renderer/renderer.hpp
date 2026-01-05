@@ -21,9 +21,11 @@ class Renderer
     void end();
 
   private:
-    
+    // Applies a Fast Fourier Transform to the Input and stores it in the Output.
+    // For an Inverse FFT, set is_inverse to true
+    void fft(Image input, Image output, bool is_inverse);
 
-private:
+  private:
     Window& window;
     GPUAdapter& gpu;
     RenderGraph& render_graph;
