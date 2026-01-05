@@ -34,8 +34,15 @@ include(scripts/cmake/shader_compilation.cmake)
 compile_shaders()
 
 # Always copy the assets folder after building
-add_custom_command(TARGET luceo POST_BUILD
+file(GLOB_RECURSE ASSETS
+    CONFIGURE_DEPENDS
+    ${CMAKE_SOURCE_DIR}/assets/*
+)
+add_custom_target(copy_assets ALL
     COMMAND ${CMAKE_COMMAND} -E copy_directory
-            ${CMAKE_SOURCE_DIR}/assets $<TARGET_FILE_DIR:luceo>/assets
+            ${CMAKE_SOURCE_DIR}/assets
+            $<TARGET_FILE_DIR:luceo>/assets
+    DEPENDS ${ASSETS}
     COMMENT "Copying assets folder to output directory"
 )
+add_dependencies(luceo copy_assets)

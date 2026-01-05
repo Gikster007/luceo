@@ -108,6 +108,14 @@ void Renderer::init()
     }
     else
         test_img = r.unwrap();
+
+    if (const Result r = bank.create_sampler(); r.is_err())
+    {
+        printf("failed to initialize linear sampler.\nreason: %s\n", r.unwrap_err().c_str());
+        return;
+    }
+    else
+        linear_sampler = r.unwrap();
 }
 
 void Renderer::update(float dt)
@@ -129,6 +137,7 @@ void Renderer::update(float dt)
         render_graph.add_compute_pass("Image Blit", "blit.cs")
                     .read(test_img)
                     .write(render_target)
+                    .read(linear_sampler)
                     .group_size(8, 8)
                     .work_size(window.width, window.height);
     }
@@ -151,6 +160,7 @@ void Renderer::end()
     bank.destroy(test_tex);
     bank.destroy(test_img);
     bank.destroy(render_target);
+    bank.destroy(linear_sampler);
 
     /* Cleanup the VRAM bank & GPU adapter */
     render_graph.deinit().expect("failed to destroy render graph.");

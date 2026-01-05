@@ -21,6 +21,9 @@ class Renderer
     void end();
 
   private:
+    
+
+private:
     Window& window;
     GPUAdapter& gpu;
     RenderGraph& render_graph;
@@ -29,6 +32,7 @@ class Renderer
 
     Texture test_tex{};
     Image test_img{};
+    Sampler linear_sampler{};
 
     ImGUI imgui{};
 };
