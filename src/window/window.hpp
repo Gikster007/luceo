@@ -26,8 +26,8 @@ class Window
   public:
     SDL_Window* window = nullptr;
 
-    int width = 1280;
-    int height = 720;
+    int width = 1920;
+    int height = 1080;
     std::string_view title{};
     bool is_running = true;
 

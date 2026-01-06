@@ -7,6 +7,11 @@ class GPUAdapter;
 class RenderGraph;
 class Window;
 
+struct Data
+{
+    uint32_t flag;
+};
+
 class Renderer
 {
   public:
@@ -37,6 +42,11 @@ class Renderer
 
     Texture freq_tex{};
     Image freq_img{};
+
+    Texture time_domain_tex{};
+    Image time_domain_img{};
+
+    Buffer data_buffer{};
 
     Sampler linear_sampler{};
 

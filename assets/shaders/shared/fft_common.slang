@@ -1,5 +1,10 @@
 module fft_common;
 
+public struct Data
+{
+    public uint flag;
+};
+
 public namespace fft
 {
 
@@ -9,7 +14,7 @@ static const uint LOG_SIZE = log(SIZE) / log(2); // result of Log base 2 of SPEC
 
 groupshared float4 fft_group_buffer[2][SIZE];
 
-void ButterflyValues(uint step, uint index, out uint2 indices, out float2 twiddle)
+void ButterflyValues(uint step, uint index, out uint2 indices, out float2 twiddle, bool is_inverse)
 {
     const float twoPi = 6.28318530718;
     uint b = SIZE >> (step + 1);
@@ -18,7 +23,7 @@ void ButterflyValues(uint step, uint index, out uint2 indices, out float2 twiddl
     sincos(-twoPi / SIZE * w, twiddle.y, twiddle.x);
 
     // This is what makes it the inverse FFT
-    //twiddle.y = -twiddle.y;
+    twiddle.y = is_inverse ? -twiddle.y : twiddle.y;
     indices = uint2(i, i + b);
 }
 
@@ -27,7 +32,7 @@ float2 ComplexMult(float2 a, float2 b)
     return float2(a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x);
 }
 
-public float4 apply_fft(uint threadIndex, float4 input)
+public float4 apply_fft(uint threadIndex, float4 input, bool is_inverse)
 {
     fft_group_buffer[0][threadIndex] = input;
     GroupMemoryBarrierWithGroupSync();
@@ -39,7 +44,7 @@ public float4 apply_fft(uint threadIndex, float4 input)
     {
         uint2 inputsIndices;
         float2 twiddle;
-        ButterflyValues(step, threadIndex, inputsIndices, twiddle);
+        ButterflyValues(step, threadIndex, inputsIndices, twiddle, is_inverse);
 
         float4 v = fft_group_buffer[flag][inputsIndices.y];
         fft_group_buffer[1 - flag][threadIndex] =

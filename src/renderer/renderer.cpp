@@ -75,7 +75,7 @@ void Renderer::init()
     int channels = -1;
     unsigned char* data = nullptr;
 
-    data = stbi_load("assets/experiment.png", &tex_width, &tex_height, &channels, 4);
+    data = stbi_load("assets/test.jpg", &tex_width, &tex_height, &channels, 4);
     if (!data)
     {
         printf("failed to load image.\n");
@@ -93,7 +93,7 @@ void Renderer::init()
     }
     else
         test_tex = r.unwrap();
-    if (const Result r = bank.upload_texture(test_tex, data, tex_width * tex_height * channels);
+    if (const Result r = bank.upload_texture(test_tex, data, tex_width * tex_height * 4);
         r.is_err())
     {
         printf("failed to upload the debug texture.\nreason: %s\n", r.unwrap_err().c_str());
@@ -111,9 +111,9 @@ void Renderer::init()
         test_img = r.unwrap();
 
     /* Initialise a frequency texture (output from a forward fft) */
-    if (const Result r =
-            bank.create_texture(TextureUsage::Sampled | TextureUsage::Storage | TextureUsage::TransferDst,
-                                TextureFormat::RGBA16Sfloat, {(u32)512, (u32)512, 0});
+    if (const Result r = bank.create_texture(TextureUsage::Sampled | TextureUsage::Storage |
+                                                 TextureUsage::TransferDst,
+                                TextureFormat::RGBA16Sfloat, {(u32)512, (u32)512, 0}, {1, 1}, "Frequency Texture");
         r.is_err())
     {
         printf("failed to initialize frequency texture.\nreason: %s\n", r.unwrap_err().c_str());
@@ -122,13 +122,33 @@ void Renderer::init()
     else
         freq_tex = r.unwrap();
     /* Initialise a frequency image, from the frequency texture */
-    if (const Result r = bank.create_image(freq_tex); r.is_err())
+    if (const Result r = bank.create_image(freq_tex, 0, 0, "Frequency Image"); r.is_err())
     {
         printf("failed to initialize frequency image.\nreason: %s\n", r.unwrap_err().c_str());
         return;
     }
     else
         freq_img = r.unwrap();
+
+    /* Initialise a time domain texture (output from a inverse fft) */
+    if (const Result r = bank.create_texture(TextureUsage::Sampled | TextureUsage::Storage |
+                                                 TextureUsage::TransferDst,
+                                TextureFormat::RGBA8Unorm, {(u32)512, (u32)512, 0}, {1, 1}, "Time Domain Texture");
+        r.is_err())
+    {
+        printf("failed to initialize time domain texture.\nreason: %s\n", r.unwrap_err().c_str());
+        return;
+    }
+    else
+        time_domain_tex = r.unwrap();
+    /* Initialise a time domain image, from the time domain texture */
+    if (const Result r = bank.create_image(time_domain_tex, 0, 0, "Time Domain Image"); r.is_err())
+    {
+        printf("failed to initialize time domain image.\nreason: %s\n", r.unwrap_err().c_str());
+        return;
+    }
+    else
+        time_domain_img = r.unwrap();
 
     /* Initialise a sampler */
     if (const Result r = bank.create_sampler(); r.is_err())
@@ -138,6 +158,17 @@ void Renderer::init()
     }
     else
         linear_sampler = r.unwrap();
+
+    /* Initialise a constant buffer to pass to the fft shaders */
+    if (const Result r = bank.create_buffer(BufferUsage::Constant | BufferUsage::TransferDst,
+                                            sizeof(Data), 0, "FFT Data Buffer");
+        r.is_err())
+    {
+        printf("failed to initialize fft data buffer.\nreason: %s\n", r.unwrap_err().c_str());
+        return;
+    }
+    else
+        data_buffer = r.unwrap();
 }
 
 static bool flag = true;
@@ -148,8 +179,8 @@ void Renderer::update(float dt)
     ImGui_ImplSDL3_NewFrame();
     ImGui::NewFrame();
 
-    bool show_demo = true;
-    ImGui::ShowDemoWindow(&show_demo);
+    bool show_metrics = true;
+    ImGui::ShowMetricsWindow(&show_metrics);
 
     ImGui::Render();
 
@@ -162,10 +193,12 @@ void Renderer::update(float dt)
         {
             fft(test_img, freq_img, false);
             flag = false;
+
+            fft(freq_img, time_domain_img, true);
         }
 
         render_graph.add_compute_pass("Image Blit", "blit.cs")
-                    .read(freq_img)
+                    .read(time_domain_img)
                     .write(render_target)
                     .read(linear_sampler)
                     .group_size(8, 8)
@@ -188,17 +221,23 @@ void Renderer::fft(Image input, Image output, bool is_inverse)
 {
     const std::string_view pass_name = is_inverse ? "Inverse FFT" : "Forward FFT";
 
-    //VRAMBank& bank = gpu.get_vram_bank();
-    //Texture output_tex = bank.get_texture(output);
+    VRAMBank& bank = gpu.get_vram_bank();
+    
+    Data data{};
+    data.flag = uint32_t(is_inverse); // 1 is for Inverse FFT and 0 for Forward FFT
+
+    render_graph.upload_buffer(data_buffer, &data, 0, sizeof(data));
 
     // clang-format off
     render_graph.add_compute_pass(pass_name, "vertical_fft.cs")
+                .read(data_buffer)
                 .read(input)
                 .write(output)
                 .group_size(1, 1)
                 .work_size(1, 512);
 
     render_graph.add_compute_pass(pass_name, "horizontal_fft.cs")
+                .read(data_buffer)
                 .read(input)
                 .write(output)
                 .group_size(1, 1)
@@ -211,11 +250,16 @@ void Renderer::end()
     VRAMBank& bank = gpu.get_vram_bank();
     bank.destroy(test_tex);
     bank.destroy(test_img);
-    
+
     bank.destroy(freq_tex);
     bank.destroy(freq_img);
 
+    bank.destroy(time_domain_tex);
+    bank.destroy(time_domain_img);
+
     bank.destroy(linear_sampler);
+
+    bank.destroy(data_buffer);
 
     bank.destroy(render_target);
 
