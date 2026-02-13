@@ -84,7 +84,7 @@ void Renderer::init()
 
     /* Initialise a debug texture */
     if (const Result r =
-            bank.create_texture(TextureUsage::Sampled | TextureUsage::TransferDst,
+            bank.create_texture("Debug Texture", TextureUsage::Sampled | TextureUsage::TransferDst,
                                 TextureFormat::RGBA8Unorm, {(u32)tex_width, (u32)tex_height, 0});
         r.is_err())
     {
@@ -102,7 +102,7 @@ void Renderer::init()
     free(data);
 
     /* Initialise a debug image, from the debug texture */
-    if (const Result r = bank.create_image(test_tex); r.is_err())
+    if (const Result r = bank.create_image("Debug Image", test_tex); r.is_err())
     {
         printf("failed to initialize debug image.\nreason: %s\n", r.unwrap_err().c_str());
         return;
@@ -111,9 +111,9 @@ void Renderer::init()
         test_img = r.unwrap();
 
     /* Initialise a frequency texture (output from a forward fft) */
-    if (const Result r = bank.create_texture(TextureUsage::Sampled | TextureUsage::Storage |
+    if (const Result r = bank.create_texture("Frequency Texture", TextureUsage::Sampled | TextureUsage::Storage |
                                                  TextureUsage::TransferDst,
-                                TextureFormat::RGBA16Sfloat, {(u32)512, (u32)512, 0}, {1, 1}, "Frequency Texture");
+                                TextureFormat::RGBA16Sfloat, {(u32)512, (u32)512, 0});
         r.is_err())
     {
         printf("failed to initialize frequency texture.\nreason: %s\n", r.unwrap_err().c_str());
@@ -122,7 +122,7 @@ void Renderer::init()
     else
         freq_tex = r.unwrap();
     /* Initialise a frequency image, from the frequency texture */
-    if (const Result r = bank.create_image(freq_tex, 0, 0, "Frequency Image"); r.is_err())
+    if (const Result r = bank.create_image("Frequency Image", freq_tex); r.is_err())
     {
         printf("failed to initialize frequency image.\nreason: %s\n", r.unwrap_err().c_str());
         return;
@@ -131,9 +131,9 @@ void Renderer::init()
         freq_img = r.unwrap();
 
     /* Initialise a time domain texture (output from a inverse fft) */
-    if (const Result r = bank.create_texture(TextureUsage::Sampled | TextureUsage::Storage |
+    if (const Result r = bank.create_texture("Time Domain Texture", TextureUsage::Sampled | TextureUsage::Storage |
                                                  TextureUsage::TransferDst,
-                                TextureFormat::RGBA8Unorm, {(u32)512, (u32)512, 0}, {1, 1}, "Time Domain Texture");
+                                TextureFormat::RGBA8Unorm, {(u32)512, (u32)512, 0});
         r.is_err())
     {
         printf("failed to initialize time domain texture.\nreason: %s\n", r.unwrap_err().c_str());
@@ -142,7 +142,8 @@ void Renderer::init()
     else
         time_domain_tex = r.unwrap();
     /* Initialise a time domain image, from the time domain texture */
-    if (const Result r = bank.create_image(time_domain_tex, 0, 0, "Time Domain Image"); r.is_err())
+    if (const Result r = bank.create_image("Time Domain Image", time_domain_tex);
+        r.is_err())
     {
         printf("failed to initialize time domain image.\nreason: %s\n", r.unwrap_err().c_str());
         return;
@@ -151,7 +152,7 @@ void Renderer::init()
         time_domain_img = r.unwrap();
 
     /* Initialise a sampler */
-    if (const Result r = bank.create_sampler(); r.is_err())
+    if (const Result r = bank.create_sampler("Linear Sampler"); r.is_err())
     {
         printf("failed to initialize linear sampler.\nreason: %s\n", r.unwrap_err().c_str());
         return;
@@ -160,8 +161,8 @@ void Renderer::init()
         linear_sampler = r.unwrap();
 
     /* Initialise a constant buffer to pass to the fft shaders */
-    if (const Result r = bank.create_buffer(BufferUsage::Constant | BufferUsage::TransferDst,
-                                            sizeof(Data), 0, "FFT Data Buffer");
+    if (const Result r = bank.create_buffer("FFT Data Buffer",  BufferUsage::Constant | BufferUsage::TransferDst,
+                                            sizeof(Data), 0);
         r.is_err())
     {
         printf("failed to initialize fft data buffer.\nreason: %s\n", r.unwrap_err().c_str());
