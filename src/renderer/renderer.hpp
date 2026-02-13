@@ -40,13 +40,17 @@ class Renderer
     Texture test_tex{};
     Image test_img{};
 
-    Texture freq_tex{};
-    Image freq_img{};
+    // Used for packing channels
+    Texture freq_rg_tex{};
+    Image freq_rg_img{};
+    Texture freq_b_tex{};
+    Image freq_b_img{};
 
-    Texture time_domain_tex{};
-    Image time_domain_img{};
+    Texture temp_tex{};
+    Image temp_img{};
 
-    Buffer data_buffer{};
+    Texture final_tex{};
+    Image final_img{};
 
     Sampler linear_sampler{};
 

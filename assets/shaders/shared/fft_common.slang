@@ -10,7 +10,7 @@ public namespace fft
 
 public static const uint SIZE = 512;
 
-static const uint LOG_SIZE = log(SIZE) / log(2); // result of Log base 2 of SPECTRUM_TEX_SIZE
+static const uint LOG_SIZE = firstbithigh(SIZE);//log(SIZE) / log(2); // result of Log base 2 of SPECTRUM_TEX_SIZE
 
 groupshared float4 fft_group_buffer[2][SIZE];
 
@@ -55,7 +55,8 @@ public float4 apply_fft(uint threadIndex, float4 input, bool is_inverse)
         GroupMemoryBarrierWithGroupSync();
     }
 
-    return fft_group_buffer[flag][threadIndex];
+    const float scale = is_inverse ? (1.0f / float(SIZE)) : 1.0f;
+    return fft_group_buffer[flag][threadIndex] * scale;
 }
 
 };
