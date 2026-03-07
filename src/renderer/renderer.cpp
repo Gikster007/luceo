@@ -82,126 +82,112 @@ void Renderer::init()
         return;
     }
 
-    /* Initialise a debug texture */
-    if (const Result r =
-            bank.create_texture("Debug Texture", TextureUsage::Sampled | TextureUsage::TransferDst,
-                                TextureFormat::RGBA8Unorm, {(u32)tex_width, (u32)tex_height, 0});
-        r.is_err())
+    /* Initialise the Input Texture */
     {
-        printf("failed to initialize debug texture.\nreason: %s\n", r.unwrap_err().c_str());
-        return;
-    }
-    else
-        test_tex = r.unwrap();
-    if (const Result r = bank.upload_texture(test_tex, data, tex_width * tex_height * 4);
-        r.is_err())
-    {
-        printf("failed to upload the debug texture.\nreason: %s\n", r.unwrap_err().c_str());
-        return;
-    }
-    free(data);
+        input_tex =
+            bank.create_texture("Input Texture", TextureUsage::Sampled | TextureUsage::TransferDst,
+                                TextureFormat::RGBA8Unorm, {(u32)tex_width, (u32)tex_height, 0})
+                .expect("failed to initialize input texture.");
+        bank.upload_texture(input_tex, data, tex_width * tex_height * 4)
+            .expect("failed to upload the input texture.");
+        free(data);
 
-    /* Initialise a debug image, from the debug texture */
-    if (const Result r = bank.create_image("Debug Image", test_tex); r.is_err())
-    {
-        printf("failed to initialize debug image.\nreason: %s\n", r.unwrap_err().c_str());
-        return;
+        /* Initialise the Input Image */
+        input_img =
+            bank.create_image("Input Image", input_tex).expect("failed to initialize input image.");
     }
-    else
-        test_img = r.unwrap();
 
-    /* Initialise a RG texture */
-    if (const Result r = bank.create_texture("Frequency RG Texture",
-                                             TextureUsage::Sampled | TextureUsage::Storage |
-                                                 TextureUsage::TransferDst,
-                                             TextureFormat::RGBA32Sfloat, {(u32)512, (u32)512, 0});
-        r.is_err())
+    /* Initialise the Kernel Texture */
     {
-        printf("failed to initialize rg texture.\nreason: %s\n", r.unwrap_err().c_str());
-        return;
+        kernel_tex =
+            bank.create_texture("Kernel Texture",
+                                TextureUsage::Sampled | TextureUsage::Storage |
+                                    TextureUsage::TransferDst,
+                                TextureFormat::RGBA32Sfloat, {(u32)tex_width, (u32)tex_height, 0})
+                .expect("failed to initialize kernel texture.");
+        
+        /* Initialise the Input Image */
+        kernel_img = bank.create_image("Kernel Image", kernel_tex)
+                         .expect("failed to initialize kernel image.");
     }
-    else
-        freq_rg_tex = r.unwrap();
-    /* Initialise a RG image, from the RG texture */
-    if (const Result r = bank.create_image("Frequency RG Image", freq_rg_tex); r.is_err())
-    {
-        printf("failed to initialize rg image.\nreason: %s\n", r.unwrap_err().c_str());
-        return;
-    }
-    else
-        freq_rg_img = r.unwrap();
 
-    /* Initialise a B texture */
-    if (const Result r = bank.create_texture("Frequency RG Texture",
-                                             TextureUsage::Sampled | TextureUsage::Storage |
-                                                 TextureUsage::TransferDst,
-                                             TextureFormat::RGBA32Sfloat, {(u32)512, (u32)512, 0});
-        r.is_err())
+    /* Initialise the Complex Image Texture (Complex Version of the Input Texture) */
     {
-        printf("failed to initialize b texture.\nreason: %s\n", r.unwrap_err().c_str());
-        return;
+        /* RG Texture */
+        image.rg_tex = bank.create_texture("Input RG Texture (Complex)",
+                                           TextureUsage::Sampled | TextureUsage::Storage |
+                                               TextureUsage::TransferDst,
+                                           TextureFormat::RGBA32Sfloat, {(u32)512, (u32)512, 0})
+                           .expect("failed to initialize input rg texture.");
+        /* RG Image */
+        image.rg_img = bank.create_image("Input RG Image (Complex)", image.rg_tex)
+                           .expect("failed to initialize input rg image.");
+
+        /* B Texture */
+        image.b_tex = bank.create_texture("Input B Texture (Complex)",
+                                          TextureUsage::Sampled | TextureUsage::Storage |
+                                              TextureUsage::TransferDst,
+                                          TextureFormat::RGBA32Sfloat, {(u32)512, (u32)512, 0})
+                          .expect("failed to initialize input b texture.");
+        /* B Image */
+        image.b_img = bank.create_image("Input B Image (Complex)", image.b_tex)
+                          .expect("failed to initialize input b image.");
     }
-    else
-        freq_b_tex = r.unwrap();
-    /* Initialise a B image, from the B texture */
-    if (const Result r = bank.create_image("Frequency RG Image", freq_b_tex); r.is_err())
+
+    /* Initialise the Complex Kernel Texture (Complex Version of the Kernel Texture) */
     {
-        printf("failed to initialize b image.\nreason: %s\n", r.unwrap_err().c_str());
-        return;
+        /* RG Texture */
+        kernel.rg_tex = bank.create_texture("Kernel RG Texture (Complex)",
+                                            TextureUsage::Sampled | TextureUsage::Storage |
+                                                TextureUsage::TransferDst,
+                                            TextureFormat::RGBA32Sfloat, {(u32)512, (u32)512, 0})
+                            .expect("failed to initialize kernel rg texture.");
+        /* RG Image */
+        kernel.rg_img = bank.create_image("Kernel RG Image (Complex)", kernel.rg_tex)
+                            .expect("failed to initialize kernel rg image.");
+
+        /* B Texture */
+        kernel.b_tex = bank.create_texture("Kernel B Texture (Complex)",
+                                           TextureUsage::Sampled | TextureUsage::Storage |
+                                               TextureUsage::TransferDst,
+                                           TextureFormat::RGBA32Sfloat, {(u32)512, (u32)512, 0})
+                           .expect("failed to initialize kernel b texture.");
+        /* B Image */
+        kernel.b_img = bank.create_image("Kernel B Image (Complex)", kernel.b_tex)
+                           .expect("failed to initialize kernel b image.");
     }
-    else
-        freq_b_img = r.unwrap();
 
     /* Initialise the Temp Texture */
-    if (const Result r = bank.create_texture("Temp Texture",
-                                             TextureUsage::Sampled | TextureUsage::Storage |
-                                                 TextureUsage::TransferDst,
-                                             TextureFormat::RGBA32Sfloat, {(u32)512, (u32)512, 0});
-        r.is_err())
     {
-        printf("failed to initialize temp texture.\nreason: %s\n", r.unwrap_err().c_str());
-        return;
+        temp_tex = bank.create_texture("Temp Texture",
+                                       TextureUsage::Sampled | TextureUsage::Storage |
+                                           TextureUsage::TransferDst,
+                                       TextureFormat::RGBA32Sfloat, {(u32)512, (u32)512, 0})
+                       .expect("failed to initialize temp texture.");
+
+        /* Initialise the temp image, from the temp texture */
+        temp_img =
+            bank.create_image("Temp Image", temp_tex).expect("failed to initialise temp image");
     }
-    else
-        temp_tex = r.unwrap();
-    /* Initialise the temp image, from the temp texture */
-    if (const Result r = bank.create_image("Temp Image", temp_tex); r.is_err())
-    {
-        printf("failed to initialize temp image.\nreason: %s\n", r.unwrap_err().c_str());
-        return;
-    }
-    else
-        temp_img = r.unwrap();
 
     /* Initialise the Final Texture */
-    if (const Result r = bank.create_texture("Final Texture",
-                                             TextureUsage::Sampled | TextureUsage::Storage |
-                                                 TextureUsage::TransferDst,
-                                             TextureFormat::RGBA32Sfloat, {(u32)512, (u32)512, 0});
-        r.is_err())
     {
-        printf("failed to initialize final texture.\nreason: %s\n", r.unwrap_err().c_str());
-        return;
-    }
-    else
-        final_tex = r.unwrap();
-    /* Initialise the final image, from the final texture */
-    if (const Result r = bank.create_image("Final Image", final_tex); r.is_err())
-    {
-        printf("failed to initialize final image.\nreason: %s\n", r.unwrap_err().c_str());
-        return;
-    }
-    else
-        final_img = r.unwrap();
+        final_tex = bank.create_texture("Final Texture",
+                                        TextureUsage::Sampled | TextureUsage::Storage |
+                                            TextureUsage::TransferDst,
+                                        TextureFormat::RGBA32Sfloat, {(u32)512, (u32)512, 0})
+                        .expect("failed to initialize final texture.");
 
-    /* Initialise a sampler */
-    if (const Result r = bank.create_sampler("Linear Sampler"); r.is_err())
-    {
-        printf("failed to initialize linear sampler.\nreason: %s\n", r.unwrap_err().c_str());
-        return;
+        /* Initialise the final image, from the final texture */
+        final_img =
+            bank.create_image("Final Image", final_tex).expect("failed to initialize final image.");
     }
-    else
-        linear_sampler = r.unwrap();
+
+    /* Initialise a Linear Sampler */
+    {
+        linear_sampler =
+            bank.create_sampler("Linear Sampler").expect("failed to initialize linear sampler.");
+    }
 }
 
 static bool flag = true;
@@ -224,28 +210,52 @@ void Renderer::update(float dt)
     {
         if (flag) 
         {
-            render_graph.add_compute_pass("Prepare FFT Input", "prepare_fft.cs")
-                        .read(test_img)
-                        .write(freq_rg_img)
-                        .write(freq_b_img)
+            /* Generate Kernel */
+            render_graph.add_compute_pass("Generate Gaussian Kernel", "gen_gauss_kernel.cs")
+                        .write(kernel_img)
                         .group_size(16, 16)
                         .work_size(512, 512);
 
-            fft(freq_rg_img, temp_img, false);
-            fft(freq_b_img, temp_img, false);
-            flag = false;
+            /* Prepare Complex Data for FFT */
+            prepare_for_fft(input_img, image);
+            prepare_for_fft(kernel_img, kernel);
 
-            fft(freq_rg_img, temp_img, true);
-            fft(freq_b_img, temp_img, true);
+            /* Bring Input Image to Freq Domain */
+            fft(image.rg_img, temp_img, FFTOption::FORWARD);
+            fft(image.b_img, temp_img, FFTOption::FORWARD);
 
+            /* Bring Kernel Image to Freq Domain */
+            fft(kernel.rg_img, temp_img, FFTOption::FORWARD);
+            fft(kernel.b_img, temp_img, FFTOption::FORWARD);
+
+            /* Multiply (in Freq Domain) */
+            render_graph.add_compute_pass("Freq Multiply RG", "freq_multiply.cs")
+                        .write(image.rg_img)
+                        .read(kernel.rg_img)
+                        .group_size(16, 16)
+                        .work_size(512, 512);
+            render_graph.add_compute_pass("Freq Multiply B", "freq_multiply.cs")
+                        .write(image.b_img)
+                        .read(kernel.b_img)
+                        .group_size(16, 16)
+                        .work_size(512, 512);
+
+            /* Bring Input Image back to Spatial/Time Domain */
+            fft(image.rg_img, temp_img, FFTOption::INVERSE);
+            fft(image.b_img, temp_img, FFTOption::INVERSE);
+
+            /* Combine RG and B Textures to the Final RGBA Texture */
             render_graph.add_compute_pass("Recombine RGB", "recombine_rgb.cs")
-                        .read(freq_rg_img)
-                        .read(freq_b_img)
+                        .read(image.rg_img)
+                        .read(image.b_img)
                         .write(final_img)
                         .group_size(16, 16)
                         .work_size(512, 512);
+            
+            flag = false;
         }
 
+        /* Output Final Image to the Screen */
         RasterNode& fs_pass = render_graph.add_raster_pass("Full Screen Triangle Pass", "fs_triangle.vx", "fs_triangle.px")
                                                 .topology(Topology::TriangleList)
                                                 .read(final_img, ShaderStages::Pixel)
@@ -253,7 +263,6 @@ void Renderer::update(float dt)
                                                 .attach(render_target)
                                                 .raster_extent(window.width, window.height);
         fs_pass.draw(NULL_BUFFER, 3);
-                    
     }
     // clang-format on
 
@@ -268,14 +277,15 @@ void Renderer::update(float dt)
         printf("failed to dispatch render graph.\nreason: %s \n", r.unwrap_err().c_str());
 }
 
-void Renderer::fft(Image image, Image temp, bool is_inverse)
+void Renderer::fft(Image image, Image temp, FFTOption option)
 {
-    const std::string_view pass_name = is_inverse ? "Inverse FFT" : "Forward FFT";
+    const bool inverse = option == FFTOption::INVERSE ? true : false;
+    const std::string_view pass_name = inverse ? "Inverse FFT" : "Forward FFT";
 
     VRAMBank& bank = gpu.get_vram_bank();
 
     Data data{};
-    data.flag = uint32_t(is_inverse); // 1 is for Inverse FFT and 0 for Forward FFT
+    data.flag = (uint32_t)inverse; // 1 is for Inverse FFT and 0 for Forward FFT
 
     // clang-format off
     render_graph.add_compute_pass(pass_name, "vertical_fft.cs")
@@ -294,16 +304,32 @@ void Renderer::fft(Image image, Image temp, bool is_inverse)
     // clang-format on
 }
 
+void Renderer::prepare_for_fft(Image input, ComplexRGB output)
+{
+    render_graph.add_compute_pass("Prepare FFT Input", "prepare_fft.cs")
+        .read(input)
+        .write(output.rg_img)
+        .write(output.b_img)
+        .group_size(16, 16)
+        .work_size(512, 512);
+}
+
 void Renderer::end()
 {
     VRAMBank& bank = gpu.get_vram_bank();
-    bank.destroy(test_tex);
-    bank.destroy(test_img);
+    bank.destroy(input_tex);
+    bank.destroy(input_img);
+    bank.destroy(kernel_tex);
+    bank.destroy(kernel_img);
 
-    bank.destroy(freq_rg_tex);
-    bank.destroy(freq_rg_img);
-    bank.destroy(freq_b_tex);
-    bank.destroy(freq_b_img);
+    bank.destroy(image.rg_tex);
+    bank.destroy(image.rg_img);
+    bank.destroy(image.b_tex);
+    bank.destroy(image.b_img);
+    bank.destroy(kernel.rg_tex);
+    bank.destroy(kernel.rg_img);
+    bank.destroy(kernel.b_tex);
+    bank.destroy(kernel.b_img);
 
     bank.destroy(temp_tex);
     bank.destroy(temp_img);

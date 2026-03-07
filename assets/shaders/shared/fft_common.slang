@@ -27,7 +27,7 @@ void ButterflyValues(uint step, uint index, out uint2 indices, out float2 twiddl
     indices = uint2(i, i + b);
 }
 
-float2 ComplexMult(float2 a, float2 b)
+public float2 ComplexMult(float2 a, float2 b)
 {
     return float2(a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x);
 }
