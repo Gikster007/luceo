@@ -31,6 +31,8 @@ Renderer::~Renderer()
 void Renderer::init()
 {
     /* Initialize the GPU adapter */
+    gpu.set_max_textures(32u);
+    gpu.set_max_images(32u);
     if (const Result r = gpu.init(true); r.is_err())
     {
         printf("failed to initialize gpu adapter.\nreason: %s \n", r.unwrap_err().c_str());
@@ -73,9 +75,9 @@ void Renderer::init()
     int tex_width = -1;
     int tex_height = -1;
     int channels = -1;
-    unsigned char* data = nullptr;
+    float* data = nullptr;
 
-    data = stbi_load("assets/test.jpg", &tex_width, &tex_height, &channels, 4);
+    data = stbi_loadf("assets/milan512.hdr", &tex_width, &tex_height, &channels, 4);
     if (!data)
     {
         printf("failed to load image.\n");
@@ -86,9 +88,9 @@ void Renderer::init()
     {
         input_tex =
             bank.create_texture("Input Texture", TextureUsage::Sampled | TextureUsage::TransferDst,
-                                TextureFormat::RGBA8Unorm, {(u32)tex_width, (u32)tex_height, 0})
+                                TextureFormat::RGBA32Sfloat, {(u32)tex_width, (u32)tex_height, 0})
                 .expect("failed to initialize input texture.");
-        bank.upload_texture(input_tex, data, tex_width * tex_height * 4)
+        bank.upload_texture(input_tex, data, tex_width * tex_height * 4 * sizeof(float))
             .expect("failed to upload the input texture.");
         free(data);
 
@@ -99,16 +101,16 @@ void Renderer::init()
 
     /* Initialise the Kernel Texture */
     {
-        kernel_tex =
-            bank.create_texture("Kernel Texture",
+        aperture_tex =
+            bank.create_texture("APerture Texture",
                                 TextureUsage::Sampled | TextureUsage::Storage |
                                     TextureUsage::TransferDst,
                                 TextureFormat::RGBA32Sfloat, {(u32)tex_width, (u32)tex_height, 0})
-                .expect("failed to initialize kernel texture.");
+                .expect("failed to initialize aperture texture.");
         
         /* Initialise the Input Image */
-        kernel_img = bank.create_image("Kernel Image", kernel_tex)
-                         .expect("failed to initialize kernel image.");
+        aperture_img = bank.create_image("APerture Image", aperture_tex)
+                         .expect("failed to initialize aperture image.");
     }
 
     /* Initialise the Complex Image Texture (Complex Version of the Input Texture) */
@@ -134,27 +136,50 @@ void Renderer::init()
                           .expect("failed to initialize input b image.");
     }
 
-    /* Initialise the Complex Kernel Texture (Complex Version of the Kernel Texture) */
+    /* Initialise the Complex Aperture Texture (Complex Version of the Aperture Texture) */
     {
         /* RG Texture */
-        kernel.rg_tex = bank.create_texture("Kernel RG Texture (Complex)",
+        aperture.rg_tex = bank.create_texture("Aperture RG Texture (Complex)",
                                             TextureUsage::Sampled | TextureUsage::Storage |
                                                 TextureUsage::TransferDst,
                                             TextureFormat::RGBA32Sfloat, {(u32)512, (u32)512, 0})
-                            .expect("failed to initialize kernel rg texture.");
+                            .expect("failed to initialize aperture rg texture.");
         /* RG Image */
-        kernel.rg_img = bank.create_image("Kernel RG Image (Complex)", kernel.rg_tex)
-                            .expect("failed to initialize kernel rg image.");
+        aperture.rg_img = bank.create_image("Aperture RG Image (Complex)", aperture.rg_tex)
+                            .expect("failed to initialize aperture rg image.");
 
         /* B Texture */
-        kernel.b_tex = bank.create_texture("Kernel B Texture (Complex)",
+        aperture.b_tex = bank.create_texture("Aperture B Texture (Complex)",
                                            TextureUsage::Sampled | TextureUsage::Storage |
                                                TextureUsage::TransferDst,
                                            TextureFormat::RGBA32Sfloat, {(u32)512, (u32)512, 0})
-                           .expect("failed to initialize kernel b texture.");
+                           .expect("failed to initialize aperture b texture.");
         /* B Image */
-        kernel.b_img = bank.create_image("Kernel B Image (Complex)", kernel.b_tex)
-                           .expect("failed to initialize kernel b image.");
+        aperture.b_img = bank.create_image("Aperture B Image (Complex)", aperture.b_tex)
+                           .expect("failed to initialize aperture b image.");
+    }
+
+    /* Initialise the Complex PSF Texture (Normalised Complex-Space Aperture) */
+    {
+        /* RG Texture */
+        psf.rg_tex = bank.create_texture("Kernel RG Texture (Complex)",
+                                         TextureUsage::Sampled | TextureUsage::Storage |
+                                             TextureUsage::TransferDst,
+                                         TextureFormat::RGBA32Sfloat, {(u32)512, (u32)512, 0})
+                         .expect("failed to initialize psf rg texture.");
+        /* RG Image */
+        psf.rg_img = bank.create_image("Kernel RG Image (Complex)", psf.rg_tex)
+                         .expect("failed to initialize psf rg image.");
+
+        /* B Texture */
+        psf.b_tex = bank.create_texture("Kernel B Texture (Complex)",
+                                        TextureUsage::Sampled | TextureUsage::Storage |
+                                            TextureUsage::TransferDst,
+                                        TextureFormat::RGBA32Sfloat, {(u32)512, (u32)512, 0})
+                        .expect("failed to initialize psf b texture.");
+        /* B Image */
+        psf.b_img = bank.create_image("Kernel B Image (Complex)", psf.b_tex)
+                        .expect("failed to initialize psf b image.");
     }
 
     /* Initialise the Temp Texture */
@@ -211,32 +236,53 @@ void Renderer::update(float dt)
         if (flag) 
         {
             /* Generate Kernel */
-            render_graph.add_compute_pass("Generate Gaussian Kernel", "gen_gauss_kernel.cs")
-                        .write(kernel_img)
+            //render_graph.add_compute_pass("Generate Gaussian Kernel", "gen_gauss_kernel.cs")
+            //            .write(kernel_img)
+            //            .group_size(16, 16)
+            //            .work_size(512, 512);
+            render_graph.add_compute_pass("Generate Aperture Mask", "aperture_mask.cs")
+                        .write(aperture_img)
                         .group_size(16, 16)
                         .work_size(512, 512);
-
+            
             /* Prepare Complex Data for FFT */
             prepare_for_fft(input_img, image);
-            prepare_for_fft(kernel_img, kernel);
+            prepare_for_fft(aperture_img, aperture);
+
+            /* Bring Aperture Image to Freq Domain */
+            fft(aperture.rg_img, temp_img, FFTOption::FORWARD);
+            fft(aperture.b_img,  temp_img, FFTOption::FORWARD);
+
+            /* Compute PSF */
+            render_graph.add_compute_pass("Compute PSF RG", "compute_psf.cs")
+            .read(aperture.rg_img)
+            .write(psf.rg_img)
+            .group_size(16, 16)
+            .work_size(512, 512);
+
+            render_graph.add_compute_pass("Compute PSF B", "compute_psf.cs")
+            .read(aperture.b_img)
+            .write(psf.b_img)
+            .group_size(16, 16)
+            .work_size(512, 512);
+
+            /* Bring PSF Image to Freq Domain */
+            fft(psf.rg_img, temp_img, FFTOption::FORWARD);
+            fft(psf.b_img, temp_img, FFTOption::FORWARD);
 
             /* Bring Input Image to Freq Domain */
             fft(image.rg_img, temp_img, FFTOption::FORWARD);
             fft(image.b_img, temp_img, FFTOption::FORWARD);
 
-            /* Bring Kernel Image to Freq Domain */
-            fft(kernel.rg_img, temp_img, FFTOption::FORWARD);
-            fft(kernel.b_img, temp_img, FFTOption::FORWARD);
-
             /* Multiply (in Freq Domain) */
             render_graph.add_compute_pass("Freq Multiply RG", "freq_multiply.cs")
                         .write(image.rg_img)
-                        .read(kernel.rg_img)
+                        .read(psf.rg_img)
                         .group_size(16, 16)
                         .work_size(512, 512);
             render_graph.add_compute_pass("Freq Multiply B", "freq_multiply.cs")
                         .write(image.b_img)
-                        .read(kernel.b_img)
+                        .read(psf.b_img)
                         .group_size(16, 16)
                         .work_size(512, 512);
 
@@ -252,7 +298,7 @@ void Renderer::update(float dt)
                         .group_size(16, 16)
                         .work_size(512, 512);
             
-            flag = false;
+            //flag = false;
         }
 
         /* Output Final Image to the Screen */
@@ -319,17 +365,21 @@ void Renderer::end()
     VRAMBank& bank = gpu.get_vram_bank();
     bank.destroy(input_tex);
     bank.destroy(input_img);
-    bank.destroy(kernel_tex);
-    bank.destroy(kernel_img);
+    bank.destroy(aperture_tex);
+    bank.destroy(aperture_img);
 
     bank.destroy(image.rg_tex);
     bank.destroy(image.rg_img);
     bank.destroy(image.b_tex);
     bank.destroy(image.b_img);
-    bank.destroy(kernel.rg_tex);
-    bank.destroy(kernel.rg_img);
-    bank.destroy(kernel.b_tex);
-    bank.destroy(kernel.b_img);
+    bank.destroy(aperture.rg_tex);
+    bank.destroy(aperture.rg_img);
+    bank.destroy(aperture.b_tex);
+    bank.destroy(aperture.b_img);
+    bank.destroy(psf.rg_tex);
+    bank.destroy(psf.rg_img);
+    bank.destroy(psf.b_tex);
+    bank.destroy(psf.b_img);
 
     bank.destroy(temp_tex);
     bank.destroy(temp_img);

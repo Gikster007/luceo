@@ -59,14 +59,16 @@ class Renderer
     Texture input_tex{};
     Image input_img{};
 
-    /* The Kernel Image That we Generate Based on User Inputs */
-    Texture kernel_tex{};
-    Image kernel_img{};
+    /* The Aperture Image That we Generate Based on User Inputs */
+    Texture aperture_tex{};
+    Image aperture_img{};
 
     /* The Input Image Transformed to Complex Format (FFT Ready) */
     ComplexRGB image;
-    /* The Kernel Image Transformed to Complex Format (FFT Ready) */
-    ComplexRGB kernel;
+    /* The Aperture Image Transformed to Complex Format (FFT Ready) */
+    ComplexRGB aperture;
+    /* The PSF (kernel) Image Transformed to Complex Format (FFT Ready) */
+    ComplexRGB psf;
 
     /* Used for Ping-Pong When Performing FFT */
     Texture temp_tex{};
